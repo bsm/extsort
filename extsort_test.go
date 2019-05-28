@@ -51,8 +51,8 @@ var _ = Describe("Sorter", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		subject = extsort.New(&extsort.Options{
-			MemLimit: 1024 * 1024,
-			WorkDir:  workDir,
+			BufferSize: 1024 * 1024,
+			WorkDir:    workDir,
 		})
 	})
 
@@ -72,7 +72,7 @@ var _ = Describe("Sorter", func() {
 
 	It("should support compression", func() {
 		compressed := extsort.New(&extsort.Options{
-			MemLimit:    1024 * 1024,
+			BufferSize:  1024 * 1024,
 			WorkDir:     workDir,
 			Compression: extsort.CompressionGzip,
 		})

@@ -91,7 +91,7 @@ type tempReader struct {
 	sections []*bufio.Reader
 }
 
-func newTempReader(name string, offsets []int64, memLimit int, compress Compression) (*tempReader, error) {
+func newTempReader(name string, offsets []int64, bufSize int, compress Compression) (*tempReader, error) {
 	f, err := os.Open(name)
 	if err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ func newTempReader(name string, offsets []int64, memLimit int, compress Compress
 		readers:  make([]io.ReadCloser, 0, len(offsets)),
 		sections: make([]*bufio.Reader, 0, len(offsets)),
 	}
-	slimit := memLimit / (len(offsets) + 1)
+	slimit := bufSize / (len(offsets) + 1)
 	offset := int64(0)
 	for _, next := range offsets {
 		crd, err := compress.newReader(io.NewSectionReader(r.f, offset, next-offset))

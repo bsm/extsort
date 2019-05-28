@@ -21,9 +21,9 @@ type Options struct {
 	// Default: bytes.Compare() < 0
 	Less Less
 
-	// MemLimit limits the memory used for sorting
+	// BufferSize limits the memory buffer used for sorting.
 	// Default: 64MiB (must be at least 64KiB)
-	MemLimit int
+	BufferSize int
 
 	// Compression optionally uses compression for temporary output.
 	Compression Compression
@@ -39,10 +39,10 @@ func (o *Options) norm() *Options {
 		opt.Less = stdLess
 	}
 
-	if std := (1 << 26); opt.MemLimit < 1 {
-		opt.MemLimit = std
-	} else if min := (1 << 16); opt.MemLimit < min {
-		opt.MemLimit = min
+	if std := (1 << 26); opt.BufferSize < 1 {
+		opt.BufferSize = std
+	} else if min := (1 << 16); opt.BufferSize < min {
+		opt.BufferSize = min
 	}
 
 	opt.Compression = opt.Compression.norm()

@@ -15,7 +15,7 @@ func New(opt *Options) *Sorter {
 
 // Append appends a data chunk to the sorter.
 func (s *Sorter) Append(data []byte) error {
-	if sz := s.buf.ByteSize(); sz > 0 && sz+len(data) > s.opt.MemLimit {
+	if sz := s.buf.ByteSize(); sz > 0 && sz+len(data) > s.opt.BufferSize {
 		if err := s.flush(); err != nil {
 			return err
 		}
@@ -81,7 +81,7 @@ type Iterator struct {
 }
 
 func newIterator(name string, offsets []int64, opt *Options) (*Iterator, error) {
-	tr, err := newTempReader(name, offsets, opt.MemLimit, opt.Compression)
+	tr, err := newTempReader(name, offsets, opt.BufferSize, opt.Compression)
 	if err != nil {
 		return nil, err
 	}

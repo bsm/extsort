@@ -14,7 +14,7 @@ func BenchmarkSorter(b *testing.B) {
 	defer fix.Close()
 
 	sorter := extsort.New(&extsort.Options{
-		MemLimit: 2 * 1024 * 1024,
+		BufferSize: 2 * 1024 * 1024,
 	})
 	defer sorter.Close()
 
