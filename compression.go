@@ -29,12 +29,13 @@ func (c Compression) newReader(r io.Reader) (io.ReadCloser, error) {
 	return plainReader{Reader: r}, nil
 }
 
-func (c Compression) newWriter() compressedWriter {
+func (c Compression) newWriter(w io.Writer) compressedWriter {
 	switch c {
 	case CompressionGzip:
-		return new(gzip.Writer)
+		wr, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
+		return wr
 	}
-	return new(plainWriter)
+	return &plainWriter{Writer: w}
 }
 
 type compressedWriter interface {

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -45,6 +46,21 @@ var _ = Describe("Sorter", func() {
 		return read, iter.Close()
 	}
 
+	fileSize := func() (int64, error) {
+		entries, err := filepath.Glob(workDir + "/*")
+		if err != nil {
+			return 0, err
+		} else if len(entries) != 1 {
+			return 0, fmt.Errorf("expected one file: %v", entries)
+		}
+
+		info, err := os.Stat(entries[0])
+		if err != nil {
+			return 0, err
+		}
+		return info.Size(), nil
+	}
+
 	BeforeEach(func() {
 		var err error
 		workDir, err = ioutil.TempDir("", "extsort-test")
@@ -83,6 +99,21 @@ var _ = Describe("Sorter", func() {
 		Expect(compressed.Append([]byte("baz"))).To(Succeed())
 		Expect(compressed.Append([]byte("dau"))).To(Succeed())
 		Expect(drain(compressed)).To(Equal([]string{"bar", "baz", "dau", "foo"}))
+	})
+
+	It("should compress temporary files", func() {
+		compressed := extsort.New(&extsort.Options{
+			BufferSize:  1024 * 1024,
+			WorkDir:     workDir,
+			Compression: extsort.CompressionGzip,
+		})
+		defer compressed.Close()
+
+		for i := 0; i < 200; i++ {
+			Expect(compressed.Append([]byte("foo"))).To(Succeed())
+		}
+		Expect(drain(compressed)).To(HaveLen(200))
+		Expect(fileSize()).To(BeNumerically("~", 50, 5))
 	})
 
 	It("should copy values", func() {

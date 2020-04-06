@@ -23,9 +23,7 @@ func newTempWriter(dir string, compress Compression) (*tempWriter, error) {
 		return nil, err
 	}
 
-	c := compress.newWriter()
-	c.Reset(f)
-
+	c := compress.newWriter(f)
 	w := bufio.NewWriterSize(c, 1<<16) // 64k
 	return &tempWriter{f: f, c: c, w: w, scratch: make([]byte, binary.MaxVarintLen64)}, nil
 }
