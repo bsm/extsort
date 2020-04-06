@@ -3,6 +3,7 @@ package extsort
 import (
 	"compress/gzip"
 	"io"
+	"io/ioutil"
 )
 
 // Compression codec.
@@ -32,7 +33,8 @@ func (c Compression) newReader(r io.Reader) (io.ReadCloser, error) {
 func (c Compression) newWriter() compressedWriter {
 	switch c {
 	case CompressionGzip:
-		return new(gzip.Writer)
+		wr, _ := gzip.NewWriterLevel(ioutil.Discard, gzip.BestSpeed)
+		return wr
 	}
 	return new(plainWriter)
 }
