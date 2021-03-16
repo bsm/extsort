@@ -2,31 +2,35 @@ package extsort
 
 import (
 	"container/heap"
-	"sort"
+
+	"github.com/twotwotwo/sorts"
 )
 
 type memBuffer struct {
 	size   int
-	chunks [][]byte
+	chunks []kv
 	less   Less
 }
 
-func (b *memBuffer) Append(data []byte) {
+func (b *memBuffer) Append(k, v []byte) {
 	n := len(b.chunks)
 	if n < cap(b.chunks) {
 		b.chunks = b.chunks[:n+1]
 	} else {
-		b.chunks = append(b.chunks, nil)
+		b.chunks = append(b.chunks, kv{})
 	}
-	b.chunks[n] = append(b.chunks[n][:0], data...)
-	b.size += len(data)
+
+	chunk := &b.chunks[n]
+	chunk.k = append(chunk.k[:0], k...)
+	chunk.v = append(chunk.v[:0], v...)
+	b.size += len(k) + len(v)
 }
 
 func (b *memBuffer) ByteSize() int      { return b.size }
 func (b *memBuffer) Len() int           { return len(b.chunks) }
-func (b *memBuffer) Less(i, j int) bool { return b.less(b.chunks[i], b.chunks[j]) }
+func (b *memBuffer) Less(i, j int) bool { return b.less(b.chunks[i].k, b.chunks[j].k) }
 func (b *memBuffer) Swap(i, j int)      { b.chunks[i], b.chunks[j] = b.chunks[j], b.chunks[i] }
-func (b *memBuffer) Sort()              { sort.Sort(b) }
+func (b *memBuffer) Sort()              { sorts.Quicksort(b) }
 
 func (b *memBuffer) Reset() {
 	b.size = 0
@@ -42,7 +46,7 @@ func (b *memBuffer) Free() {
 
 type heapItem struct {
 	section int
-	data    []byte
+	data    kv
 }
 
 type minHeap struct {
@@ -51,7 +55,7 @@ type minHeap struct {
 }
 
 func (h *minHeap) Len() int           { return len(h.items) }
-func (h *minHeap) Less(i, j int) bool { return h.less(h.items[i].data, h.items[j].data) }
+func (h *minHeap) Less(i, j int) bool { return h.less(h.items[i].data.k, h.items[j].data.k) }
 func (h *minHeap) Swap(i, j int)      { h.items[i], h.items[j] = h.items[j], h.items[i] }
 func (h *minHeap) Push(x interface{}) { h.items = append(h.items, x.(heapItem)) }
 func (h *minHeap) Pop() interface{} {
@@ -61,11 +65,11 @@ func (h *minHeap) Pop() interface{} {
 	return x
 }
 
-func (h *minHeap) PushData(section int, data []byte) {
+func (h *minHeap) PushData(section int, data kv) {
 	heap.Push(h, heapItem{section: section, data: data})
 }
 
-func (h *minHeap) PopData() (int, []byte) {
+func (h *minHeap) PopData() (int, kv) {
 	ent := heap.Pop(h).(heapItem)
 	return ent.section, ent.data
 }

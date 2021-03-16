@@ -1,5 +1,9 @@
 package extsort
 
+import (
+	"bytes"
+)
+
 // Sorter is responsible for sorting.
 type Sorter struct {
 	opt *Options
@@ -15,13 +19,17 @@ func New(opt *Options) *Sorter {
 
 // Append appends a data chunk to the sorter.
 func (s *Sorter) Append(data []byte) error {
-	if sz := s.buf.ByteSize(); sz > 0 && sz+len(data) > s.opt.BufferSize {
+	return s.AppendKV(data, nil)
+}
+
+func (s *Sorter) AppendKV(k, v []byte) error {
+	if sz := s.buf.ByteSize(); sz > 0 && sz+len(k)+len(v) > s.opt.BufferSize {
 		if err := s.flush(); err != nil {
 			return err
 		}
 	}
 
-	s.buf.Append(data)
+	s.buf.Append(k, v)
 	return nil
 }
 
@@ -46,6 +54,14 @@ func (s *Sorter) Close() error {
 	return nil
 }
 
+func (s *Sorter) Size() int64 {
+	sum := int64(s.buf.ByteSize())
+	if s.tw == nil {
+		return sum
+	}
+	return sum + s.tw.Size()
+}
+
 func (s *Sorter) flush() error {
 	if s.tw == nil {
 		tw, err := newTempWriter(s.opt.WorkDir, s.opt.Compression)
@@ -56,7 +72,16 @@ func (s *Sorter) flush() error {
 	}
 
 	s.buf.Sort()
+
+	var last []byte // for dups
 	for _, data := range s.buf.chunks {
+		if s.opt.RemoveDuplicates {
+			if bytes.Equal(data.k, last) {
+				continue
+			}
+			last = append(last[:0], data.k...)
+		}
+
 		if err := s.tw.Encode(data); err != nil {
 			return err
 		}
@@ -73,10 +98,12 @@ func (s *Sorter) flush() error {
 
 // Iterator instances are used to iterate over sorted output.
 type Iterator struct {
-	tr   *tempReader
-	heap *minHeap
+	tr         *tempReader
+	heap       *minHeap
+	removeDups bool
 
-	data []byte
+	data kv
+	last []byte
 	err  error
 }
 
@@ -86,7 +113,7 @@ func newIterator(name string, offsets []int64, opt *Options) (*Iterator, error) 
 		return nil, err
 	}
 
-	iter := &Iterator{tr: tr, heap: &minHeap{less: opt.Less}}
+	iter := &Iterator{tr: tr, heap: &minHeap{less: opt.Less}, removeDups: opt.RemoveDuplicates}
 	for i := 0; i < tr.NumSections(); i++ {
 		if err := iter.fillHeap(i); err != nil {
 			_ = tr.Close()
@@ -98,6 +125,21 @@ func newIterator(name string, offsets []int64, opt *Options) (*Iterator, error) 
 
 // Next advances the iterator to the next item and returns true if successful.
 func (i *Iterator) Next() bool {
+	for i.next() {
+		if !i.removeDups {
+			return true
+		}
+
+		if bytes.Equal(i.data.k, i.last) {
+			continue
+		}
+		i.last = append(i.last[:0], i.data.k...)
+		return true
+	}
+	return false
+}
+
+func (i *Iterator) next() bool {
 	if i.err != nil {
 		return false
 	}
@@ -117,7 +159,11 @@ func (i *Iterator) Next() bool {
 
 // Data returns the data at the current cursor position.
 func (i *Iterator) Data() []byte {
-	return i.data
+	return i.data.k
+}
+
+func (i *Iterator) DataKV() (k, v []byte) {
+	return i.data.k, i.data.v
 }
 
 // Err returns the error, if occurred.
@@ -135,8 +181,12 @@ func (i *Iterator) fillHeap(section int) error {
 	if err != nil {
 		return err
 	}
-	if data != nil {
+	if data.k != nil {
 		i.heap.PushData(section, data)
 	}
 	return nil
+}
+
+type kv struct {
+	k, v []byte
 }

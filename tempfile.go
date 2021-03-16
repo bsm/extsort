@@ -15,6 +15,7 @@ type tempWriter struct {
 
 	scratch []byte
 	offsets []int64
+	size    int64
 }
 
 func newTempWriter(dir string, compress Compression) (*tempWriter, error) {
@@ -32,19 +33,28 @@ func (t *tempWriter) Name() string {
 	return t.f.Name()
 }
 
-func (t *tempWriter) Encode(p []byte) error {
-	n := binary.PutUvarint(t.scratch, uint64(len(p)))
+func (t *tempWriter) Encode(kv kv) error {
+	n := binary.PutUvarint(t.scratch, uint64(len(kv.k)))
 	if _, err := t.Write(t.scratch[:n]); err != nil {
 		return err
 	}
-	if _, err := t.Write(p); err != nil {
+	n = binary.PutUvarint(t.scratch, uint64(len(kv.v)))
+	if _, err := t.Write(t.scratch[:n]); err != nil {
+		return err
+	}
+	if _, err := t.Write(kv.k); err != nil {
+		return err
+	}
+	if _, err := t.Write(kv.v); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (t *tempWriter) Write(p []byte) (int, error) {
-	return t.w.Write(p)
+	n, err := t.w.Write(p)
+	t.size += int64(n)
+	return n, err
 }
 
 func (t *tempWriter) Flush() error {
@@ -78,6 +88,10 @@ func (t *tempWriter) Close() (err error) {
 		err = e
 	}
 	return
+}
+
+func (t *tempWriter) Size() int64 {
+	return t.size
 }
 
 // --------------------------------------------------------------------
@@ -121,25 +135,33 @@ func (t *tempReader) NumSections() int {
 	return len(t.sections)
 }
 
-func (t *tempReader) ReadNext(section int) ([]byte, error) {
+func (t *tempReader) ReadNext(section int) (kv, error) {
 	r := t.sections[section]
 	if r == nil {
-		return nil, nil
+		return kv{}, nil
 	}
 
-	n, err := binary.ReadUvarint(r)
+	kn, err := binary.ReadUvarint(r)
 	if err == io.EOF {
 		t.sections[section] = nil
-		return nil, nil
+		return kv{}, nil
 	} else if err != nil {
-		return nil, err
+		return kv{}, err
+	}
+	vn, err := binary.ReadUvarint(r)
+	if err != nil {
+		return kv{}, err
 	}
 
-	data := make([]byte, int(n))
-	if _, err := io.ReadFull(r, data); err != nil {
-		return nil, err
+	k := make([]byte, int(kn))
+	v := make([]byte, int(vn))
+	if _, err := io.ReadFull(r, k); err != nil {
+		return kv{}, err
 	}
-	return data, nil
+	if _, err := io.ReadFull(r, v); err != nil {
+		return kv{}, err
+	}
+	return kv{k, v}, nil
 }
 
 func (t *tempReader) Close() (err error) {

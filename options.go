@@ -27,6 +27,8 @@ type Options struct {
 
 	// Compression optionally uses compression for temporary output.
 	Compression Compression
+
+	RemoveDuplicates bool
 }
 
 func (o *Options) norm() *Options {
