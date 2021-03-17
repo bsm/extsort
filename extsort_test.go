@@ -78,15 +78,33 @@ var _ = Describe("Sorter", func() {
 		Expect(os.RemoveAll(workDir)).To(Succeed())
 	})
 
-	It("should append/sort data", func() {
+	It("appends/sorts data", func() {
 		Expect(subject.Append([]byte("foo"))).To(Succeed())
 		Expect(subject.Append([]byte("bar"))).To(Succeed())
 		Expect(subject.Append([]byte("baz"))).To(Succeed())
+		Expect(subject.Append([]byte("foo"))).To(Succeed())
+		Expect(subject.Append([]byte("dau"))).To(Succeed())
+		Expect(subject.Append([]byte("bar"))).To(Succeed())
+		Expect(drain(subject)).To(Equal([]string{"bar", "bar", "baz", "dau", "foo", "foo"}))
+	})
+
+	It("can de-duplicate", func() {
+		subject = extsort.New(&extsort.Options{
+			BufferSize: 64 * 1024,
+			Dedupe:     bytes.Equal,
+			WorkDir:    workDir,
+		})
+
+		for i := 0; i < 100_000; i++ {
+			Expect(subject.Append([]byte("foo"))).To(Succeed())
+			Expect(subject.Append([]byte("baz"))).To(Succeed())
+		}
+		Expect(subject.Append([]byte("bar"))).To(Succeed())
 		Expect(subject.Append([]byte("dau"))).To(Succeed())
 		Expect(drain(subject)).To(Equal([]string{"bar", "baz", "dau", "foo"}))
 	})
 
-	It("should support compression", func() {
+	It("supports compression", func() {
 		compressed := extsort.New(&extsort.Options{
 			BufferSize:  1024 * 1024,
 			WorkDir:     workDir,
@@ -101,7 +119,7 @@ var _ = Describe("Sorter", func() {
 		Expect(drain(compressed)).To(Equal([]string{"bar", "baz", "dau", "foo"}))
 	})
 
-	It("should compress temporary files", func() {
+	It("compresses temporary files", func() {
 		compressed := extsort.New(&extsort.Options{
 			BufferSize:  1024 * 1024,
 			WorkDir:     workDir,
@@ -116,7 +134,7 @@ var _ = Describe("Sorter", func() {
 		Expect(fileSize()).To(BeNumerically("~", 50, 5))
 	})
 
-	It("should copy values", func() {
+	It("copies values", func() {
 		var val []byte
 		Expect(subject.Append(append(val[:0], "foo"...))).To(Succeed())
 		Expect(subject.Append(append(val[:0], "bar"...))).To(Succeed())
@@ -125,11 +143,11 @@ var _ = Describe("Sorter", func() {
 		Expect(drain(subject)).To(Equal([]string{"bar", "baz", "dau", "foo"}))
 	})
 
-	It("should not fail when blank", func() {
+	It("does not fail when blank", func() {
 		Expect(drain(subject)).To(BeEmpty())
 	})
 
-	It("should sort large data sets with constant memory", func() {
+	It("sorts large data sets with constant memory", func() {
 		fix, err := seedFixture()
 		Expect(err).NotTo(HaveOccurred())
 		defer fix.Close()
