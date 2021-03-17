@@ -7,6 +7,9 @@ import (
 // Less compares byte chunks.
 type Less func(a, b []byte) bool
 
+// Equal compares two byte chunks for equality.
+type Equal func(a, b []byte) bool
+
 func stdLess(a, b []byte) bool {
 	return bytes.Compare(a, b) < 0
 }
@@ -20,6 +23,10 @@ type Options struct {
 	// Less defines the compare function.
 	// Default: bytes.Compare() < 0
 	Less Less
+
+	// Dedupe defines the compare function for de-duplication.
+	// Default: nil (= do not de-dupe)
+	Dedupe Equal
 
 	// BufferSize limits the memory buffer used for sorting.
 	// Default: 64MiB (must be at least 64KiB)

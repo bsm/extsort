@@ -58,7 +58,16 @@ func (s *Sorter) flush() error {
 	}
 
 	s.buf.Sort()
+
+	var last []byte // store last for de-duplication
 	for _, data := range s.buf.chunks {
+		if s.opt.Dedupe != nil {
+			if last != nil && s.opt.Dedupe(data, last) {
+				continue
+			}
+			last = append(last[:0], data...)
+		}
+
 		if err := s.tw.Encode(data); err != nil {
 			return err
 		}
@@ -78,8 +87,10 @@ type Iterator struct {
 	tr   *tempReader
 	heap *minHeap
 
-	data *bytebufferpool.ByteBuffer
-	err  error
+	data   *bytebufferpool.ByteBuffer
+	last   []byte
+	dedupe Equal
+	err    error
 }
 
 func newIterator(name string, offsets []int64, opt *Options) (*Iterator, error) {
@@ -88,7 +99,7 @@ func newIterator(name string, offsets []int64, opt *Options) (*Iterator, error) 
 		return nil, err
 	}
 
-	iter := &Iterator{tr: tr, heap: &minHeap{less: opt.Less}}
+	iter := &Iterator{tr: tr, heap: &minHeap{less: opt.Less}, dedupe: opt.Dedupe}
 	for i := 0; i < tr.NumSections(); i++ {
 		if err := iter.fillHeap(i); err != nil {
 			_ = tr.Close()
@@ -100,6 +111,19 @@ func newIterator(name string, offsets []int64, opt *Options) (*Iterator, error) 
 
 // Next advances the iterator to the next item and returns true if successful.
 func (i *Iterator) Next() bool {
+	for i.next() {
+		if i.dedupe != nil {
+			if i.last != nil && i.dedupe(i.data.B, i.last) {
+				continue
+			}
+			i.last = append(i.last[:0], i.data.B...)
+		}
+		return true
+	}
+	return false
+}
+
+func (i *Iterator) next() bool {
 	if i.err != nil {
 		return false
 	}
