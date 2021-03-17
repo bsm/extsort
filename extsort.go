@@ -1,5 +1,7 @@
 package extsort
 
+import "github.com/valyala/bytebufferpool"
+
 // Sorter is responsible for sorting.
 type Sorter struct {
 	opt *Options
@@ -76,7 +78,7 @@ type Iterator struct {
 	tr   *tempReader
 	heap *minHeap
 
-	data []byte
+	data *bytebufferpool.ByteBuffer
 	err  error
 }
 
@@ -107,17 +109,22 @@ func (i *Iterator) Next() bool {
 
 	section, data := i.heap.PopData()
 	if err := i.fillHeap(section); err != nil {
+		bufferPool.Put(data)
 		i.err = err
 		return false
 	}
 
+	prev := i.data
 	i.data = data
+	if prev != nil {
+		bufferPool.Put(prev)
+	}
 	return true
 }
 
 // Data returns the data at the current cursor position.
 func (i *Iterator) Data() []byte {
-	return i.data
+	return i.data.B
 }
 
 // Err returns the error, if occurred.
@@ -127,6 +134,11 @@ func (i *Iterator) Err() error {
 
 // Close closes the iterator.
 func (i *Iterator) Close() error {
+	if i.data != nil {
+		bufferPool.Put(i.data)
+		i.data = nil
+	}
+
 	return i.tr.Close()
 }
 
