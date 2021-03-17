@@ -6,6 +6,8 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+
+	"github.com/valyala/bytebufferpool"
 )
 
 type tempWriter struct {
@@ -121,13 +123,13 @@ func (t *tempReader) NumSections() int {
 	return len(t.sections)
 }
 
-func (t *tempReader) ReadNext(section int) ([]byte, error) {
+func (t *tempReader) ReadNext(section int) (*bytebufferpool.ByteBuffer, error) {
 	r := t.sections[section]
 	if r == nil {
 		return nil, nil
 	}
 
-	n, err := binary.ReadUvarint(r)
+	u, err := binary.ReadUvarint(r)
 	if err == io.EOF {
 		t.sections[section] = nil
 		return nil, nil
@@ -135,8 +137,14 @@ func (t *tempReader) ReadNext(section int) ([]byte, error) {
 		return nil, err
 	}
 
-	data := make([]byte, int(n))
-	if _, err := io.ReadFull(r, data); err != nil {
+	data := bufferPool.Get()
+	if n := int(u); cap(data.B) < n {
+		data.B = make([]byte, n)
+	} else {
+		data.B = data.B[:n]
+	}
+
+	if _, err := io.ReadFull(r, data.B); err != nil {
 		return nil, err
 	}
 	return data, nil
