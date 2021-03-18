@@ -57,7 +57,7 @@ func (s *Sorter) flush() error {
 		s.tw = tw
 	}
 
-	s.buf.Sort()
+	s.opt.Sort(s.buf)
 
 	var last []byte // store last for de-duplication
 	for _, data := range s.buf.chunks {

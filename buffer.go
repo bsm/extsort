@@ -2,7 +2,6 @@ package extsort
 
 import (
 	"container/heap"
-	"sort"
 
 	"github.com/valyala/bytebufferpool"
 )
@@ -30,7 +29,6 @@ func (b *memBuffer) ByteSize() int      { return b.size }
 func (b *memBuffer) Len() int           { return len(b.chunks) }
 func (b *memBuffer) Less(i, j int) bool { return b.less(b.chunks[i], b.chunks[j]) }
 func (b *memBuffer) Swap(i, j int)      { b.chunks[i], b.chunks[j] = b.chunks[j], b.chunks[i] }
-func (b *memBuffer) Sort()              { sort.Sort(b) }
 
 func (b *memBuffer) Reset() {
 	b.size = 0
