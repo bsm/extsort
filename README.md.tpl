@@ -9,6 +9,8 @@ with a predictable amount of memory using disk.
 
 ## Example:
 
+Sorting lines:
+
 ```go
 import(
   "fmt"
@@ -16,5 +18,17 @@ import(
   "github.com/bsm/extsort"
 )
 
-func main() {{ "Example" | code }}
+func main() {{ "Example_plain" | code }}
+```
+
+Map-style API with de-duplication:
+
+```go
+import(
+  "fmt"
+
+  "github.com/bsm/extsort"
+)
+
+func main() {{ "Example_map" | code }}
 ```
