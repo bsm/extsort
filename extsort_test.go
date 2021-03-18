@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"testing"
 
 	"github.com/bsm/extsort"
@@ -89,19 +90,35 @@ var _ = Describe("Sorter", func() {
 	})
 
 	It("can de-duplicate", func() {
-		subject = extsort.New(&extsort.Options{
+		deduped := extsort.New(&extsort.Options{
 			BufferSize: 64 * 1024,
 			Dedupe:     bytes.Equal,
 			WorkDir:    workDir,
 		})
+		defer deduped.Close()
 
 		for i := 0; i < 100_000; i++ {
-			Expect(subject.Append([]byte("foo"))).To(Succeed())
-			Expect(subject.Append([]byte("baz"))).To(Succeed())
+			Expect(deduped.Append([]byte("foo"))).To(Succeed())
+			Expect(deduped.Append([]byte("baz"))).To(Succeed())
 		}
-		Expect(subject.Append([]byte("bar"))).To(Succeed())
-		Expect(subject.Append([]byte("dau"))).To(Succeed())
-		Expect(drain(subject)).To(Equal([]string{"bar", "baz", "dau", "foo"}))
+		Expect(deduped.Append([]byte("bar"))).To(Succeed())
+		Expect(deduped.Append([]byte("dau"))).To(Succeed())
+		Expect(drain(deduped)).To(Equal([]string{"bar", "baz", "dau", "foo"}))
+	})
+
+	It("supports custom sorting", func() {
+		reverse := extsort.New(&extsort.Options{
+			BufferSize: 1024 * 1024,
+			WorkDir:    workDir,
+			Sort:       func(v sort.Interface) { sort.Sort(sort.Reverse(v)) },
+		})
+		defer reverse.Close()
+
+		Expect(reverse.Append([]byte("foo"))).To(Succeed())
+		Expect(reverse.Append([]byte("bar"))).To(Succeed())
+		Expect(reverse.Append([]byte("baz"))).To(Succeed())
+		Expect(reverse.Append([]byte("dau"))).To(Succeed())
+		Expect(drain(reverse)).To(Equal([]string{"foo", "dau", "baz", "bar"}))
 	})
 
 	It("supports compression", func() {

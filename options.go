@@ -2,6 +2,7 @@ package extsort
 
 import (
 	"bytes"
+	"sort"
 )
 
 // Less compares byte chunks.
@@ -24,6 +25,10 @@ type Options struct {
 	// Default: bytes.Compare() < 0
 	Less Less
 
+	// Sort defines the sort function that is used.
+	// Default: sort.Sort
+	Sort func(sort.Interface)
+
 	// Dedupe defines the compare function for de-duplication.
 	// Default: nil (= do not de-dupe)
 	Dedupe Equal
@@ -44,6 +49,10 @@ func (o *Options) norm() *Options {
 
 	if opt.Less == nil {
 		opt.Less = stdLess
+	}
+
+	if opt.Sort == nil {
+		opt.Sort = sort.Sort
 	}
 
 	if std := (1 << 26); opt.BufferSize < 1 {
