@@ -30,21 +30,33 @@ var _ = Describe("Sorter", func() {
 		return ms.Alloc / 1024
 	}
 
-	drain := func(s *extsort.Sorter) ([]string, error) {
+	drain := func(s *extsort.Sorter) ([][2]string, error) {
 		iter, err := s.Sort()
 		if err != nil {
 			return nil, err
 		}
 		defer iter.Close()
 
-		read := make([]string, 0, 4)
+		read := make([][2]string, 0, 4)
 		for iter.Next() {
-			read = append(read, string(iter.Data()))
+			read = append(read, [2]string{string(iter.Key()), string(iter.Value())})
 		}
 		if err := iter.Err(); err != nil {
 			return nil, err
 		}
 		return read, iter.Close()
+	}
+
+	keys := func(s *extsort.Sorter) ([]string, error) {
+		pairs, err := drain(s)
+		if err != nil {
+			return nil, err
+		}
+		keys := make([]string, 0, len(pairs))
+		for _, pair := range pairs {
+			keys = append(keys, pair[0])
+		}
+		return keys, nil
 	}
 
 	fileSize := func() (int64, error) {
@@ -79,6 +91,23 @@ var _ = Describe("Sorter", func() {
 		Expect(os.RemoveAll(workDir)).To(Succeed())
 	})
 
+	It("puts/sorts data", func() {
+		Expect(subject.Put([]byte("foo"), []byte("v1"))).To(Succeed())
+		Expect(subject.Put([]byte("bar"), []byte("v2"))).To(Succeed())
+		Expect(subject.Put([]byte("baz"), []byte("v3"))).To(Succeed())
+		Expect(subject.Put([]byte("foo"), []byte("v4"))).To(Succeed())
+		Expect(subject.Put([]byte("dau"), []byte("v5"))).To(Succeed())
+		Expect(subject.Put([]byte("bar"), []byte("v6"))).To(Succeed())
+		Expect(drain(subject)).To(Equal([][2]string{
+			{"bar", "v2"},
+			{"bar", "v6"},
+			{"baz", "v3"},
+			{"dau", "v5"},
+			{"foo", "v1"},
+			{"foo", "v4"},
+		}))
+	})
+
 	It("appends/sorts data", func() {
 		Expect(subject.Append([]byte("foo"))).To(Succeed())
 		Expect(subject.Append([]byte("bar"))).To(Succeed())
@@ -86,7 +115,14 @@ var _ = Describe("Sorter", func() {
 		Expect(subject.Append([]byte("foo"))).To(Succeed())
 		Expect(subject.Append([]byte("dau"))).To(Succeed())
 		Expect(subject.Append([]byte("bar"))).To(Succeed())
-		Expect(drain(subject)).To(Equal([]string{"bar", "bar", "baz", "dau", "foo", "foo"}))
+		Expect(drain(subject)).To(Equal([][2]string{
+			{"bar", ""},
+			{"bar", ""},
+			{"baz", ""},
+			{"dau", ""},
+			{"foo", ""},
+			{"foo", ""},
+		}))
 	})
 
 	It("can de-duplicate", func() {
@@ -98,12 +134,18 @@ var _ = Describe("Sorter", func() {
 		defer deduped.Close()
 
 		for i := 0; i < 100_000; i++ {
-			Expect(deduped.Append([]byte("foo"))).To(Succeed())
-			Expect(deduped.Append([]byte("baz"))).To(Succeed())
+			val := []byte(fmt.Sprintf("x%d", i%10))
+			Expect(deduped.Put([]byte("foo"), val)).To(Succeed())
+			Expect(deduped.Put([]byte("baz"), val)).To(Succeed())
 		}
-		Expect(deduped.Append([]byte("bar"))).To(Succeed())
-		Expect(deduped.Append([]byte("dau"))).To(Succeed())
-		Expect(drain(deduped)).To(Equal([]string{"bar", "baz", "dau", "foo"}))
+		Expect(deduped.Put([]byte("bar"), []byte("v1"))).To(Succeed())
+		Expect(deduped.Put([]byte("dau"), []byte("v2"))).To(Succeed())
+		Expect(drain(deduped)).To(Equal([][2]string{
+			{"bar", "v1"},
+			{"baz", "x4"},
+			{"dau", "v2"},
+			{"foo", "x9"},
+		}))
 	})
 
 	It("supports custom sorting", func() {
@@ -118,22 +160,25 @@ var _ = Describe("Sorter", func() {
 		Expect(reverse.Append([]byte("bar"))).To(Succeed())
 		Expect(reverse.Append([]byte("baz"))).To(Succeed())
 		Expect(reverse.Append([]byte("dau"))).To(Succeed())
-		Expect(drain(reverse)).To(Equal([]string{"foo", "dau", "baz", "bar"}))
+		Expect(keys(reverse)).To(Equal([]string{"foo", "dau", "baz", "bar"}))
 	})
 
 	It("supports compression", func() {
 		compressed := extsort.New(&extsort.Options{
 			BufferSize:  1024 * 1024,
+			Dedupe:      bytes.Equal,
 			WorkDir:     workDir,
 			Compression: extsort.CompressionGzip,
 		})
 		defer compressed.Close()
 
-		Expect(compressed.Append([]byte("foo"))).To(Succeed())
-		Expect(compressed.Append([]byte("bar"))).To(Succeed())
-		Expect(compressed.Append([]byte("baz"))).To(Succeed())
-		Expect(compressed.Append([]byte("dau"))).To(Succeed())
-		Expect(drain(compressed)).To(Equal([]string{"bar", "baz", "dau", "foo"}))
+		for i := 0; i < 100; i++ {
+			Expect(compressed.Append([]byte("foo"))).To(Succeed())
+			Expect(compressed.Append([]byte("bar"))).To(Succeed())
+			Expect(compressed.Append([]byte("baz"))).To(Succeed())
+			Expect(compressed.Append([]byte("dau"))).To(Succeed())
+		}
+		Expect(keys(compressed)).To(Equal([]string{"bar", "baz", "dau", "foo"}))
 	})
 
 	It("compresses temporary files", func() {
@@ -144,11 +189,12 @@ var _ = Describe("Sorter", func() {
 		})
 		defer compressed.Close()
 
-		for i := 0; i < 200; i++ {
-			Expect(compressed.Append([]byte("foo"))).To(Succeed())
+		val := bytes.Repeat([]byte{'x'}, 4096)
+		for i := 0; i < 50; i++ {
+			Expect(compressed.Put([]byte("foo"), val)).To(Succeed())
 		}
-		Expect(drain(compressed)).To(HaveLen(200))
-		Expect(fileSize()).To(BeNumerically("~", 50, 5))
+		Expect(drain(compressed)).To(HaveLen(50))
+		Expect(fileSize()).To(BeNumerically("~", 420, 5))
 	})
 
 	It("copies values", func() {
@@ -157,7 +203,7 @@ var _ = Describe("Sorter", func() {
 		Expect(subject.Append(append(val[:0], "bar"...))).To(Succeed())
 		Expect(subject.Append(append(val[:0], "baz"...))).To(Succeed())
 		Expect(subject.Append(append(val[:0], "dau"...))).To(Succeed())
-		Expect(drain(subject)).To(Equal([]string{"bar", "baz", "dau", "foo"}))
+		Expect(keys(subject)).To(Equal([]string{"bar", "baz", "dau", "foo"}))
 	})
 
 	It("does not fail when blank", func() {
@@ -165,12 +211,14 @@ var _ = Describe("Sorter", func() {
 	})
 
 	It("sorts large data sets with constant memory", func() {
+		val := bytes.Repeat([]byte{'x'}, 1024)
+
 		fix, err := seedFixture()
 		Expect(err).NotTo(HaveOccurred())
 		defer fix.Close()
 
 		for fix.Scan() {
-			Expect(subject.Append(fix.Bytes())).To(Succeed())
+			Expect(subject.Put(fix.Bytes(), val)).To(Succeed())
 		}
 		Expect(fix.Err()).NotTo(HaveOccurred())
 		Expect(memUsed()).To(BeNumerically("<", 4096))
@@ -188,7 +236,7 @@ var _ = Describe("Sorter", func() {
 		}
 		Expect(iter.Err()).NotTo(HaveOccurred())
 		Expect(iter.Close()).To(Succeed())
-		Expect(memUsed()).To(BeNumerically("<", 1024))
+		Expect(memUsed()).To(BeNumerically("<", 2048))
 	})
 })
 
@@ -213,7 +261,7 @@ func seedData() (string, error) {
 	b64 := base64.RawStdEncoding
 	val := make([]byte, b64.EncodedLen(len(buf)))
 
-	for i := 0; i < 1e6; i++ {
+	for i := 0; i < 1e5; i++ {
 		buf = buf[:20+rnd.Intn(40)]
 		val = val[:b64.EncodedLen(len(buf))]
 

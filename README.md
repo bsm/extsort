@@ -9,6 +9,8 @@ with a predictable amount of memory using disk.
 
 ## Example:
 
+Sorting lines:
+
 ```go
 import(
   "fmt"
@@ -17,11 +19,11 @@ import(
 )
 
 func main() {
-	// Create sorter.
+	// Init sorter.
 	sorter := extsort.New(nil)
 	defer sorter.Close()
 
-	// Append data.
+	// Append plain data.
 	_ = sorter.Append([]byte("foo"))
 	_ = sorter.Append([]byte("bar"))
 	_ = sorter.Append([]byte("baz"))
@@ -36,6 +38,46 @@ func main() {
 
 	for iter.Next() {
 		fmt.Println(string(iter.Data()))
+	}
+	if err := iter.Err(); err != nil {
+		panic(err)
+	}
+
+}
+```
+
+Map-style API with de-duplication:
+
+```go
+import(
+  "fmt"
+
+  "github.com/bsm/extsort"
+)
+
+func main() {
+	// Init with de-duplication.
+	sorter := extsort.New(&extsort.Options{
+		Dedupe: bytes.Equal,
+	})
+	defer sorter.Close()
+
+	// Put key/value data.
+	_ = sorter.Put([]byte("foo"), []byte("v1"))
+	_ = sorter.Put([]byte("bar"), []byte("v2"))
+	_ = sorter.Put([]byte("baz"), []byte("v3"))
+	_ = sorter.Put([]byte("bar"), []byte("v4"))	// duplicate
+	_ = sorter.Put([]byte("dau"), []byte("v5"))
+
+	// Sort and iterate.
+	iter, err := sorter.Sort()
+	if err != nil {
+		panic(err)
+	}
+	defer iter.Close()
+
+	for iter.Next() {
+		fmt.Println(string(iter.Key()), string(iter.Value()))
 	}
 	if err := iter.Err(); err != nil {
 		panic(err)

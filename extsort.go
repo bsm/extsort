@@ -1,7 +1,5 @@
 package extsort
 
-import "github.com/valyala/bytebufferpool"
-
 // Sorter is responsible for sorting.
 type Sorter struct {
 	opt *Options
@@ -17,13 +15,18 @@ func New(opt *Options) *Sorter {
 
 // Append appends a data chunk to the sorter.
 func (s *Sorter) Append(data []byte) error {
-	if sz := s.buf.ByteSize(); sz > 0 && sz+len(data) > s.opt.BufferSize {
+	return s.Put(data, nil)
+}
+
+// Put inserts a key value pair into the sorter.
+func (s *Sorter) Put(key, value []byte) error {
+	if sz := s.buf.ByteSize(); sz > 0 && sz+len(key)+len(value) > s.opt.BufferSize {
 		if err := s.flush(); err != nil {
 			return err
 		}
 	}
 
-	s.buf.Append(data)
+	s.buf.Append(key, value)
 	return nil
 }
 
@@ -59,16 +62,17 @@ func (s *Sorter) flush() error {
 
 	s.opt.Sort(s.buf)
 
-	var last []byte // store last for de-duplication
-	for _, data := range s.buf.chunks {
+	var lastKey []byte // store last for de-duplication
+	for _, ent := range s.buf.ents {
 		if s.opt.Dedupe != nil {
-			if last != nil && s.opt.Dedupe(data, last) {
+			key := ent.Key()
+			if lastKey != nil && s.opt.Dedupe(key, lastKey) {
 				continue
 			}
-			last = append(last[:0], data...)
+			lastKey = append(lastKey[:0], key...)
 		}
 
-		if err := s.tw.Encode(data); err != nil {
+		if err := s.tw.Encode(&ent); err != nil {
 			return err
 		}
 	}
@@ -87,10 +91,10 @@ type Iterator struct {
 	tr   *tempReader
 	heap *minHeap
 
-	data   *bytebufferpool.ByteBuffer
-	last   []byte
-	dedupe Equal
-	err    error
+	ent     *entry
+	lastKey []byte
+	dedupe  Equal
+	err     error
 }
 
 func newIterator(name string, offsets []int64, opt *Options) (*Iterator, error) {
@@ -113,10 +117,11 @@ func newIterator(name string, offsets []int64, opt *Options) (*Iterator, error) 
 func (i *Iterator) Next() bool {
 	for i.next() {
 		if i.dedupe != nil {
-			if i.last != nil && i.dedupe(i.data.B, i.last) {
+			key := i.ent.Key()
+			if i.lastKey != nil && i.dedupe(key, i.lastKey) {
 				continue
 			}
-			i.last = append(i.last[:0], i.data.B...)
+			i.lastKey = append(i.lastKey[:0], key...)
 		}
 		return true
 	}
@@ -131,24 +136,34 @@ func (i *Iterator) next() bool {
 		return false
 	}
 
-	section, data := i.heap.PopData()
+	section, ent := i.heap.PopEntry()
 	if err := i.fillHeap(section); err != nil {
-		bufferPool.Put(data)
+		ent.Release()
 		i.err = err
 		return false
 	}
 
-	prev := i.data
-	i.data = data
+	prev := i.ent
+	i.ent = ent
 	if prev != nil {
-		bufferPool.Put(prev)
+		prev.Release()
 	}
 	return true
 }
 
-// Data returns the data at the current cursor position.
+// Key returns the key at the current cursor position.
+func (i *Iterator) Key() []byte {
+	return i.ent.Key()
+}
+
+// Value returns the value at the current cursor position.
+func (i *Iterator) Value() []byte {
+	return i.ent.Val()
+}
+
+// Data returns the data at the current cursor position (alias for Key).
 func (i *Iterator) Data() []byte {
-	return i.data.B
+	return i.Key()
 }
 
 // Err returns the error, if occurred.
@@ -158,21 +173,21 @@ func (i *Iterator) Err() error {
 
 // Close closes the iterator.
 func (i *Iterator) Close() error {
-	if i.data != nil {
-		bufferPool.Put(i.data)
-		i.data = nil
+	if i.ent != nil {
+		i.ent.Release()
+		i.ent = nil
 	}
 
 	return i.tr.Close()
 }
 
 func (i *Iterator) fillHeap(section int) error {
-	data, err := i.tr.ReadNext(section)
+	ent, err := i.tr.ReadNext(section)
 	if err != nil {
 		return err
 	}
-	if data != nil {
-		i.heap.PushData(section, data)
+	if ent != nil {
+		i.heap.PushEntry(section, ent)
 	}
 	return nil
 }

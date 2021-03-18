@@ -6,8 +6,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-
-	"github.com/valyala/bytebufferpool"
 )
 
 type tempWriter struct {
@@ -34,12 +32,14 @@ func (t *tempWriter) Name() string {
 	return t.f.Name()
 }
 
-func (t *tempWriter) Encode(p []byte) error {
-	n := binary.PutUvarint(t.scratch, uint64(len(p)))
-	if _, err := t.Write(t.scratch[:n]); err != nil {
+func (t *tempWriter) Encode(ent *entry) error {
+	if err := t.encodeSize(ent.keyLen); err != nil {
 		return err
 	}
-	if _, err := t.Write(p); err != nil {
+	if err := t.encodeSize(ent.ValLen()); err != nil {
+		return err
+	}
+	if _, err := t.Write(ent.data); err != nil {
 		return err
 	}
 	return nil
@@ -80,6 +80,14 @@ func (t *tempWriter) Close() (err error) {
 		err = e
 	}
 	return
+}
+
+func (t *tempWriter) encodeSize(sz int) error {
+	n := binary.PutUvarint(t.scratch, uint64(sz))
+	if _, err := t.Write(t.scratch[:n]); err != nil {
+		return err
+	}
+	return nil
 }
 
 // --------------------------------------------------------------------
@@ -123,13 +131,13 @@ func (t *tempReader) NumSections() int {
 	return len(t.sections)
 }
 
-func (t *tempReader) ReadNext(section int) (*bytebufferpool.ByteBuffer, error) {
+func (t *tempReader) ReadNext(section int) (*entry, error) {
 	r := t.sections[section]
 	if r == nil {
 		return nil, nil
 	}
 
-	u, err := binary.ReadUvarint(r)
+	ku, err := binary.ReadUvarint(r)
 	if err == io.EOF {
 		t.sections[section] = nil
 		return nil, nil
@@ -137,17 +145,20 @@ func (t *tempReader) ReadNext(section int) (*bytebufferpool.ByteBuffer, error) {
 		return nil, err
 	}
 
-	data := bufferPool.Get()
-	if n := int(u); cap(data.B) < n {
-		data.B = make([]byte, n)
-	} else {
-		data.B = data.B[:n]
-	}
-
-	if _, err := io.ReadFull(r, data.B); err != nil {
+	vu, err := binary.ReadUvarint(r)
+	if err == io.EOF {
+		t.sections[section] = nil
+		return nil, nil
+	} else if err != nil {
 		return nil, err
 	}
-	return data, nil
+
+	ent := fetchEntry(int(ku), int(vu))
+	if _, err := io.ReadFull(r, ent.data); err != nil {
+		ent.Release()
+		return nil, err
+	}
+	return ent, nil
 }
 
 func (t *tempReader) Close() (err error) {
