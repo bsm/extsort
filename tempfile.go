@@ -15,6 +15,7 @@ type tempWriter struct {
 
 	scratch []byte
 	offsets []int64
+	size    int64
 }
 
 func newTempWriter(dir string, compress Compression) (*tempWriter, error) {
@@ -46,7 +47,9 @@ func (t *tempWriter) Encode(ent *entry) error {
 }
 
 func (t *tempWriter) Write(p []byte) (int, error) {
-	return t.w.Write(p)
+	n, err := t.w.Write(p)
+	t.size += int64(n)
+	return n, err
 }
 
 func (t *tempWriter) Flush() error {
@@ -88,6 +91,10 @@ func (t *tempWriter) encodeSize(sz int) error {
 		return err
 	}
 	return nil
+}
+
+func (t *tempWriter) Size() int64 {
+	return t.size
 }
 
 // --------------------------------------------------------------------
