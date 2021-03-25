@@ -51,6 +51,15 @@ func (s *Sorter) Close() error {
 	return nil
 }
 
+// Size returns the buffered and written size.
+func (s *Sorter) Size() int64 {
+	sum := int64(s.buf.ByteSize())
+	if s.tw == nil {
+		return sum
+	}
+	return sum + s.tw.Size()
+}
+
 func (s *Sorter) flush() error {
 	if s.tw == nil {
 		tw, err := newTempWriter(s.opt.WorkDir, s.opt.Compression)
