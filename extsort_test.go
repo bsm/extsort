@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
-	"strconv"
 	"testing"
 
 	"github.com/bsm/extsort"
@@ -243,11 +242,15 @@ var _ = Describe("Sorter", func() {
 	It("allows access to appended size", func() {
 		Expect(subject.Append([]byte("foo"))).To(Succeed())
 		Expect(subject.Size()).To(BeNumerically("==", 3))
-		for i := 0; i < (1<<16)*10; i++ {
-			v := strconv.Itoa(i)
-			Expect(subject.Append([]byte(v))).To(Succeed())
+
+		rnd := rand.New(rand.NewSource(33))
+		buf := make([]byte, 100)
+		for i := 0; i < 10_000; i++ {
+			buf = buf[:rnd.Intn(cap(buf))]
+			Expect(rnd.Read(buf)).To(Equal(len(buf)))
+			Expect(subject.Append(buf)).To(Succeed())
 		}
-		Expect(subject.Size()).To(BeNumerically("==", 4906663))
+		Expect(subject.Size()).To(BeNumerically("==", 491_063))
 	})
 })
 
