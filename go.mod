@@ -1,8 +1,8 @@
 module github.com/bsm/extsort
 
-go 1.13
+go 1.15
 
 require (
-	github.com/onsi/ginkgo v1.8.0
-	github.com/onsi/gomega v1.5.0
+	github.com/bsm/ginkgo v1.16.0
+	github.com/bsm/gomega v1.11.0
 )
