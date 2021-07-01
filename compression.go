@@ -3,6 +3,8 @@ package extsort
 import (
 	"compress/gzip"
 	"io"
+
+	"github.com/golang/snappy"
 )
 
 // Compression codec.
@@ -12,10 +14,11 @@ type Compression uint8
 const (
 	CompressionNone Compression = iota
 	CompressionGzip
+	CompressionSnappy
 )
 
 func (c Compression) norm() Compression {
-	if c < CompressionNone || c > CompressionGzip {
+	if c < CompressionNone || c > CompressionSnappy {
 		return CompressionNone
 	}
 	return c
@@ -25,8 +28,11 @@ func (c Compression) newReader(r io.Reader) (io.ReadCloser, error) {
 	switch c {
 	case CompressionGzip:
 		return gzip.NewReader(r)
+	case CompressionSnappy:
+		r := snappy.NewReader(r)
+		return readerNoopCloser{Reader: r}, nil
 	}
-	return plainReader{Reader: r}, nil
+	return readerNoopCloser{Reader: r}, nil
 }
 
 func (c Compression) newWriter(w io.Writer) compressedWriter {
@@ -34,8 +40,11 @@ func (c Compression) newWriter(w io.Writer) compressedWriter {
 	case CompressionGzip:
 		wr, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
 		return wr
+	case CompressionSnappy:
+		wr := snappy.NewBufferedWriter(w)
+		return wr
 	}
-	return &plainWriter{Writer: w}
+	return &writerNoopCloser{Writer: w}
 }
 
 type compressedWriter interface {
@@ -44,11 +53,11 @@ type compressedWriter interface {
 	Close() error
 }
 
-type plainReader struct{ io.Reader }
+type readerNoopCloser struct{ io.Reader }
 
-func (plainReader) Close() error { return nil }
+func (readerNoopCloser) Close() error { return nil }
 
-type plainWriter struct{ io.Writer }
+type writerNoopCloser struct{ io.Writer }
 
-func (w *plainWriter) Reset(wr io.Writer) { w.Writer = wr }
-func (*plainWriter) Close() error         { return nil }
+func (w *writerNoopCloser) Reset(wr io.Writer) { w.Writer = wr }
+func (*writerNoopCloser) Close() error         { return nil }

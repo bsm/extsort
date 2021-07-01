@@ -163,38 +163,46 @@ var _ = Describe("Sorter", func() {
 		Expect(keys(reverse)).To(Equal([]string{"foo", "dau", "baz", "bar"}))
 	})
 
-	It("supports compression", func() {
-		compressed := extsort.New(&extsort.Options{
-			BufferSize:  1024 * 1024,
-			Dedupe:      bytes.Equal,
-			WorkDir:     workDir,
-			Compression: extsort.CompressionGzip,
-		})
-		defer compressed.Close()
+	Context("supports compression", func() {
+		test := func(c extsort.Compression) {
+			compressed := extsort.New(&extsort.Options{
+				BufferSize:  1024 * 1024,
+				Dedupe:      bytes.Equal,
+				WorkDir:     workDir,
+				Compression: c,
+			})
+			defer compressed.Close()
 
-		for i := 0; i < 100; i++ {
-			Expect(compressed.Append([]byte("foo"))).To(Succeed())
-			Expect(compressed.Append([]byte("bar"))).To(Succeed())
-			Expect(compressed.Append([]byte("baz"))).To(Succeed())
-			Expect(compressed.Append([]byte("dau"))).To(Succeed())
+			for i := 0; i < 100; i++ {
+				Expect(compressed.Append([]byte("foo"))).To(Succeed())
+				Expect(compressed.Append([]byte("bar"))).To(Succeed())
+				Expect(compressed.Append([]byte("baz"))).To(Succeed())
+				Expect(compressed.Append([]byte("dau"))).To(Succeed())
+			}
+			Expect(keys(compressed)).To(Equal([]string{"bar", "baz", "dau", "foo"}))
 		}
-		Expect(keys(compressed)).To(Equal([]string{"bar", "baz", "dau", "foo"}))
+		It("gzip compresses", func() { test(extsort.CompressionGzip) })
+		It("snappy compresses", func() { test(extsort.CompressionSnappy) })
 	})
 
-	It("compresses temporary files", func() {
-		compressed := extsort.New(&extsort.Options{
-			BufferSize:  1024 * 1024,
-			WorkDir:     workDir,
-			Compression: extsort.CompressionGzip,
-		})
-		defer compressed.Close()
+	Context("compresses temporary files", func() {
+		test := func(c extsort.Compression, expSize int) {
+			compressed := extsort.New(&extsort.Options{
+				BufferSize:  1024 * 1024,
+				WorkDir:     workDir,
+				Compression: c,
+			})
+			defer compressed.Close()
 
-		val := bytes.Repeat([]byte{'x'}, 4096)
-		for i := 0; i < 50; i++ {
-			Expect(compressed.Put([]byte("foo"), val)).To(Succeed())
+			val := bytes.Repeat([]byte{'x'}, 4096)
+			for i := 0; i < 50; i++ {
+				Expect(compressed.Put([]byte("foo"), val)).To(Succeed())
+			}
+			Expect(drain(compressed)).To(HaveLen(50))
+			Expect(fileSize()).To(BeNumerically("~", expSize, 5))
 		}
-		Expect(drain(compressed)).To(HaveLen(50))
-		Expect(fileSize()).To(BeNumerically("~", 420, 5))
+		It("gzip compresses", func() { test(extsort.CompressionGzip, 420) })
+		It("snappy compresses", func() { test(extsort.CompressionSnappy, 9717) })
 	})
 
 	It("copies values", func() {
