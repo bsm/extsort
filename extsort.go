@@ -81,7 +81,7 @@ func (s *Sorter) flush() error {
 			lastKey = append(lastKey[:0], key...)
 		}
 
-		if err := s.tw.Encode(&ent); err != nil {
+		if err := s.tw.Encode(ent); err != nil {
 			return err
 		}
 	}

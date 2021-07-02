@@ -6,21 +6,18 @@ import (
 
 type memBuffer struct {
 	size int
-	ents []entry
+	ents []*entry
 	less Less
 }
 
 func (b *memBuffer) Append(key, val []byte) {
-	n := len(b.ents)
-	if n < cap(b.ents) {
-		b.ents = b.ents[:n+1]
-	} else {
-		b.ents = append(b.ents, entry{})
-	}
+	ent := fetchEntry(len(key), len(val))
 
-	ent := &b.ents[n]
-	ent.data = append(append(ent.data[:0], key...), val...)
-	ent.keyLen = len(key)
+	n := copy(ent.data, key)
+	copy(ent.data[n:], val)
+
+	b.ents = append(b.ents, ent)
+
 	b.size += len(ent.data)
 }
 
@@ -30,12 +27,15 @@ func (b *memBuffer) Less(i, j int) bool { return b.less(b.ents[i].Key(), b.ents[
 func (b *memBuffer) Swap(i, j int)      { b.ents[i], b.ents[j] = b.ents[j], b.ents[i] }
 
 func (b *memBuffer) Reset() {
+	for _, e := range b.ents {
+		e.Release()
+	}
 	b.size = 0
 	b.ents = b.ents[:0]
 }
 
 func (b *memBuffer) Free() {
-	b.size = 0
+	b.Reset()
 	b.ents = nil
 }
 
