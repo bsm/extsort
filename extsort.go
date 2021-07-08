@@ -78,7 +78,7 @@ func (s *Sorter) flush() error {
 			if lastKey != nil && s.opt.Dedupe(key, lastKey) {
 				continue
 			}
-			lastKey = append(lastKey[:0], key...)
+			lastKey = key
 		}
 
 		if err := s.tw.Encode(ent); err != nil {
