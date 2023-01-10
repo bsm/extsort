@@ -130,6 +130,7 @@ var _ = Describe("Sorter", func() {
 			BufferSize: 64 * 1024,
 			Dedupe:     bytes.Equal,
 			WorkDir:    workDir,
+			Sort:       sort.Stable,
 		})
 		defer deduped.Close()
 
