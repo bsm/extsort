@@ -192,6 +192,7 @@ var _ = Describe("Sorter", func() {
 				BufferSize:  1024 * 1024,
 				WorkDir:     workDir,
 				Compression: c,
+				KeepFiles:   true,
 			})
 			defer compressed.Close()
 
