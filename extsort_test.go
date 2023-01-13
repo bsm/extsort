@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -76,7 +75,7 @@ var _ = Describe("Sorter", func() {
 
 	BeforeEach(func() {
 		var err error
-		workDir, err = ioutil.TempDir("", "extsort-test")
+		workDir, err = os.MkdirTemp("", "extsort-test")
 		Expect(err).NotTo(HaveOccurred())
 
 		subject = extsort.New(&extsort.Options{
@@ -272,7 +271,7 @@ func TestSuite(t *testing.T) {
 // --------------------------------------------------------------------
 
 func seedData() (string, error) {
-	f, err := ioutil.TempFile("", "extsort-test")
+	f, err := os.CreateTemp("", "extsort-test")
 	if err != nil {
 		return "", err
 	}

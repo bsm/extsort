@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/binary"
 	"io"
-	"io/ioutil"
 	"os"
 )
 
@@ -13,20 +12,21 @@ type tempWriter struct {
 	c compressedWriter
 	w *bufio.Writer
 
+	rmtmp   bool
 	scratch []byte
 	offsets []int64
 	size    int64
 }
 
 func newTempWriter(dir string, compress Compression) (*tempWriter, error) {
-	f, err := ioutil.TempFile(dir, "extsort")
+	f, rmtmp, err := createTempFile(dir)
 	if err != nil {
 		return nil, err
 	}
 
 	c := compress.newWriter(f)
 	w := bufio.NewWriterSize(c, 1<<16) // 64k
-	return &tempWriter{f: f, c: c, w: w, scratch: make([]byte, binary.MaxVarintLen64)}, nil
+	return &tempWriter{f: f, c: c, w: w, rmtmp: rmtmp, scratch: make([]byte, binary.MaxVarintLen64)}, nil
 }
 
 func (t *tempWriter) Name() string {
@@ -79,8 +79,10 @@ func (t *tempWriter) Close() (err error) {
 	if e := t.f.Close(); e != nil {
 		err = e
 	}
-	if e := os.Remove(t.f.Name()); e != nil {
-		err = e
+	if t.rmtmp {
+		if e := os.Remove(t.f.Name()); e != nil {
+			err = e
+		}
 	}
 	return
 }

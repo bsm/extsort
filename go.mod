@@ -6,4 +6,5 @@ require (
 	github.com/bsm/ginkgo v1.16.0
 	github.com/bsm/gomega v1.11.0
 	github.com/golang/snappy v0.0.4
+	golang.org/x/sys v0.4.0
 )
