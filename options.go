@@ -5,14 +5,14 @@ import (
 	"sort"
 )
 
-// Less compares byte chunks.
-type Less func(a, b []byte) bool
+// Compares byte chunks. -1 for a < b and 0 for a == b.
+type Compare func(a, b []byte) int
 
 // Equal compares two byte chunks for equality.
 type Equal func(a, b []byte) bool
 
-func stdLess(a, b []byte) bool {
-	return bytes.Compare(a, b) < 0
+func stdCompare(a, b []byte) int {
+	return bytes.Compare(a, b)
 }
 
 // Options contains sorting options
@@ -21,9 +21,9 @@ type Options struct {
 	// By default os.TempDir() is used.
 	WorkDir string
 
-	// Less defines the compare function.
-	// Default: bytes.Compare() < 0
-	Less Less
+	// Compare defines the compare function.
+	// Default: bytes.Compare
+	Compare Compare
 
 	// Sort defines the sort function that is used.
 	// Default: sort.Sort
@@ -31,6 +31,7 @@ type Options struct {
 
 	// Dedupe defines the compare function for de-duplication.
 	// Default: nil (= do not de-dupe)
+	// Keeps the last added item.
 	Dedupe Equal
 
 	// BufferSize limits the memory buffer used for sorting.
@@ -47,8 +48,8 @@ func (o *Options) norm() *Options {
 		opt = *o
 	}
 
-	if opt.Less == nil {
-		opt.Less = stdLess
+	if opt.Compare == nil {
+		opt.Compare = stdCompare
 	}
 
 	if opt.Sort == nil {

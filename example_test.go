@@ -36,7 +36,7 @@ func Example_map() {
 	}
 
 	// Output:
-	// bar v2
+	// bar v4
 	// baz v3
 	// dau v5
 	// foo v1
