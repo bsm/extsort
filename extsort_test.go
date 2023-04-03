@@ -15,7 +15,7 @@ import (
 
 	"github.com/bsm/extsort"
 
-	. "github.com/bsm/ginkgo"
+	. "github.com/bsm/ginkgo/v2"
 	. "github.com/bsm/gomega"
 )
 
@@ -200,10 +200,10 @@ var _ = Describe("Sorter", func() {
 				Expect(compressed.Put([]byte("foo"), val)).To(Succeed())
 			}
 			Expect(drain(compressed)).To(HaveLen(50))
-			Expect(fileSize()).To(BeNumerically("~", expSize, 5))
+			Expect(fileSize()).To(BeNumerically("~", expSize, 100))
 		}
-		It("gzip compresses", func() { test(extsort.CompressionGzip, 420) })
-		It("snappy compresses", func() { test(extsort.CompressionSnappy, 9717) })
+		It("gzip compresses", func() { test(extsort.CompressionGzip, 400) })
+		It("snappy compresses", func() { test(extsort.CompressionSnappy, 10400) })
 	})
 
 	It("copies values", func() {

@@ -4,7 +4,7 @@ import (
 	"compress/gzip"
 	"io"
 
-	"github.com/golang/snappy"
+	"github.com/klauspost/compress/snappy"
 )
 
 // Compression codec.
