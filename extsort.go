@@ -10,7 +10,7 @@ type Sorter struct {
 // New inits a sorter
 func New(opt *Options) *Sorter {
 	opt = opt.norm()
-	return &Sorter{opt: opt, buf: &memBuffer{less: opt.Less}}
+	return &Sorter{opt: opt, buf: &memBuffer{compare: opt.Compare}}
 }
 
 // Append appends a data chunk to the sorter.
@@ -78,10 +78,10 @@ func (s *Sorter) flush() error {
 			if lastKey != nil && s.opt.Dedupe(key, lastKey) {
 				continue
 			}
-			lastKey = append(lastKey[:0], key...)
+			lastKey = key
 		}
 
-		if err := s.tw.Encode(ent); err != nil {
+		if err := s.tw.Encode(ent.entry); err != nil {
 			return err
 		}
 	}
@@ -112,7 +112,7 @@ func newIterator(name string, offsets []int64, opt *Options) (*Iterator, error) 
 		return nil, err
 	}
 
-	iter := &Iterator{tr: tr, heap: &minHeap{less: opt.Less}, dedupe: opt.Dedupe}
+	iter := &Iterator{tr: tr, heap: &minHeap{compare: opt.Compare}, dedupe: opt.Dedupe}
 	for i := 0; i < tr.NumSections(); i++ {
 		if err := iter.fillHeap(i); err != nil {
 			_ = tr.Close()

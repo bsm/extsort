@@ -99,12 +99,12 @@ var _ = Describe("Sorter", func() {
 		Expect(subject.Put([]byte("dau"), []byte("v5"))).To(Succeed())
 		Expect(subject.Put([]byte("bar"), []byte("v6"))).To(Succeed())
 		Expect(drain(subject)).To(Equal([][2]string{
-			{"bar", "v2"},
 			{"bar", "v6"},
+			{"bar", "v2"},
 			{"baz", "v3"},
 			{"dau", "v5"},
-			{"foo", "v1"},
 			{"foo", "v4"},
+			{"foo", "v1"},
 		}))
 	})
 
@@ -130,11 +130,12 @@ var _ = Describe("Sorter", func() {
 			BufferSize: 64 * 1024,
 			Dedupe:     bytes.Equal,
 			WorkDir:    workDir,
+			Sort:       sort.Stable,
 		})
 		defer deduped.Close()
 
 		for i := 0; i < 100_000; i++ {
-			val := []byte(fmt.Sprintf("x%d", i%10))
+			val := []byte(fmt.Sprintf("x%d", i))
 			Expect(deduped.Put([]byte("foo"), val)).To(Succeed())
 			Expect(deduped.Put([]byte("baz"), val)).To(Succeed())
 		}
@@ -142,9 +143,9 @@ var _ = Describe("Sorter", func() {
 		Expect(deduped.Put([]byte("dau"), []byte("v2"))).To(Succeed())
 		Expect(drain(deduped)).To(Equal([][2]string{
 			{"bar", "v1"},
-			{"baz", "x4"},
+			{"baz", "x99999"},
 			{"dau", "v2"},
-			{"foo", "x9"},
+			{"foo", "x99999"},
 		}))
 	})
 

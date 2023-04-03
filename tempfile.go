@@ -60,7 +60,7 @@ func (t *tempWriter) Flush() error {
 		return err
 	}
 
-	pos, err := t.f.Seek(0, os.SEEK_CUR)
+	pos, err := t.f.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return err
 	}
