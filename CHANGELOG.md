@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.6.0 (2023-04-03)
+
+### Improvements
+
+- Keep last item when deduplicating [#15](https://github.com/bsm/extsort/pull/15)
+- Use more modern snappy compression implementation [#16](https://github.com/bsm/extsort/pull/16)
+
+### Breaking Changes
+
+- `Less` option has been replaced by more generic `Compare` [#15](https://github.com/bsm/extsort/pull/15)
+
 ## v0.5.0 (2021-03-25)
 
 ### Improvements
