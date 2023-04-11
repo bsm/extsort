@@ -1,5 +1,7 @@
 package extsort
 
+import "io"
+
 // Sorter is responsible for sorting.
 type Sorter struct {
 	opt *Options
@@ -40,7 +42,7 @@ func (s *Sorter) Sort() (*Iterator, error) {
 	s.buf.Free()
 
 	// wrap in an iterator
-	return newIterator(s.tw.Name(), s.tw.offsets, s.opt)
+	return newIterator(s.tw.ReaderAt(), s.tw.offsets, s.opt)
 }
 
 // Close stops the processing and removes temporary files.
@@ -62,7 +64,7 @@ func (s *Sorter) Size() int64 {
 
 func (s *Sorter) flush() error {
 	if s.tw == nil {
-		tw, err := newTempWriter(s.opt.WorkDir, s.opt.Compression)
+		tw, err := newTempWriter(s.opt.WorkDir, s.opt.Compression, s.opt.KeepFiles)
 		if err != nil {
 			return err
 		}
@@ -106,8 +108,8 @@ type Iterator struct {
 	err     error
 }
 
-func newIterator(name string, offsets []int64, opt *Options) (*Iterator, error) {
-	tr, err := newTempReader(name, offsets, opt.BufferSize, opt.Compression)
+func newIterator(ra io.ReaderAt, offsets []int64, opt *Options) (*Iterator, error) {
+	tr, err := newTempReader(ra, offsets, opt.BufferSize, opt.Compression)
 	if err != nil {
 		return nil, err
 	}
