@@ -1,10 +1,19 @@
 # Changelog
 
-## Unreleased
+## v0.7.0 (2026-06-16)
 
 ### New Features
 
 - Support zstd compression via `CompressionZstd`
+
+### Improvements
+
+- Modernise codebase, target Go 1.26 and convert tests to the standard library
+- Shared CI workflow and `golangci-lint` cleanup
+
+### Bug Fixes
+
+- Fix a faulty bounds check in `Compression.norm` that could never reject under-range values
 
 ## v0.6.1 (2023-04-11)
 
