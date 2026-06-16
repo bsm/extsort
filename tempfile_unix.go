@@ -1,5 +1,4 @@
 //go:build unix
-// +build unix
 
 package extsort
 
@@ -15,7 +14,7 @@ func newTempFile(dir, pattern string, keepFile bool) (*os.File, error) {
 	}
 	// immediately remove for less chance of orphaning.
 	if err := os.Remove(f.Name()); err != nil {
-		f.Close()
+		_ = f.Close()
 		return nil, err
 	}
 	return f, nil

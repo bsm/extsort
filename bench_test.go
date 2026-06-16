@@ -11,12 +11,12 @@ func BenchmarkSorter(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer fix.Close()
+	defer func() { _ = fix.Close() }()
 
 	sorter := extsort.New(&extsort.Options{
 		BufferSize: 2 * 1024 * 1024,
 	})
-	defer sorter.Close()
+	defer func() { _ = sorter.Close() }()
 
 	b.ResetTimer()
 
@@ -37,7 +37,7 @@ func BenchmarkSorter(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer iter.Close()
+	defer func() { _ = iter.Close() }()
 
 	for i := range b.N {
 		if !iter.Next() {

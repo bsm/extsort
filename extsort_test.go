@@ -58,7 +58,7 @@ func drain(s *extsort.Sorter) ([][2]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer iter.Close()
+	defer func() { _ = iter.Close() }()
 
 	read := make([][2]string, 0, 4)
 	for iter.Next() {
@@ -182,7 +182,7 @@ func TestSorter_Dedupe(t *testing.T) {
 		WorkDir:    workDir,
 		Sort:       sort.Stable,
 	})
-	defer deduped.Close()
+	defer func() { _ = deduped.Close() }()
 
 	for i := range 100_000 {
 		val := fmt.Appendf(nil, "x%d", i)
@@ -214,7 +214,7 @@ func TestSorter_CustomSort(t *testing.T) {
 		WorkDir:    workDir,
 		Sort:       func(v sort.Interface) { sort.Sort(sort.Reverse(v)) },
 	})
-	defer reverse.Close()
+	defer func() { _ = reverse.Close() }()
 
 	mustAppend(t, reverse, "foo")
 	mustAppend(t, reverse, "bar")
@@ -244,7 +244,7 @@ func TestSorter_Compression(t *testing.T) {
 				WorkDir:     workDir,
 				Compression: tc.comp,
 			})
-			defer compressed.Close()
+			defer func() { _ = compressed.Close() }()
 
 			for range 100 {
 				mustAppend(t, compressed, "foo")
@@ -279,7 +279,7 @@ func TestSorter_CompressTempFiles(t *testing.T) {
 				Compression: tc.comp,
 				KeepFiles:   true,
 			})
-			defer compressed.Close()
+			defer func() { _ = compressed.Close() }()
 
 			val := bytes.Repeat([]byte{'x'}, 4096)
 			for range 50 {
@@ -334,7 +334,7 @@ func TestSorter_ConstantMemory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer fix.Close()
+	defer func() { _ = fix.Close() }()
 
 	for fix.Scan() {
 		if err := subject.Put(fix.Bytes(), val); err != nil {
@@ -355,7 +355,7 @@ func TestSorter_ConstantMemory(t *testing.T) {
 	if used := memUsed(); used >= 4096 {
 		t.Errorf("expected memory usage < 4096, got %d", used)
 	}
-	defer iter.Close()
+	defer func() { _ = iter.Close() }()
 
 	var prev []byte
 	for iter.Next() {
@@ -409,22 +409,23 @@ func seedData() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	rnd := rand.New(rand.NewSource(33))
 	buf := make([]byte, 100)
 	b64 := base64.RawStdEncoding
-	val := make([]byte, b64.EncodedLen(len(buf)))
+	val := make([]byte, b64.EncodedLen(len(buf))+1) // +1 for the trailing newline
 
 	for range int(1e5) {
 		buf = buf[:20+rnd.Intn(40)]
-		val = val[:b64.EncodedLen(len(buf))]
 
 		if _, err := rnd.Read(buf); err != nil {
 			return "", err
 		}
+		n := b64.EncodedLen(len(buf))
 		b64.Encode(val, buf)
-		if _, err := f.Write(append(val, '\n')); err != nil {
+		val[n] = '\n'
+		if _, err := f.Write(val[:n+1]); err != nil {
 			return "", err
 		}
 	}
