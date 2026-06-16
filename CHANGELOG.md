@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### New Features
+
+- Support zstd compression via `CompressionZstd`
+
 ## v0.6.1 (2023-04-11)
 
 ### Improvements

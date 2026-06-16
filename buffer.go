@@ -73,9 +73,9 @@ func (h *minHeap) Less(i, j int) bool {
 	}
 	return a.section > b.section
 }
-func (h *minHeap) Swap(i, j int)      { h.items[i], h.items[j] = h.items[j], h.items[i] }
-func (h *minHeap) Push(x interface{}) { h.items = append(h.items, x.(heapItem)) }
-func (h *minHeap) Pop() interface{} {
+func (h *minHeap) Swap(i, j int) { h.items[i], h.items[j] = h.items[j], h.items[i] }
+func (h *minHeap) Push(x any)    { h.items = append(h.items, x.(heapItem)) }
+func (h *minHeap) Pop() any {
 	n := len(h.items)
 	x := h.items[n-1]
 	h.items = h.items[:n-1]

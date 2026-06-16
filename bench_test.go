@@ -39,8 +39,8 @@ func BenchmarkSorter(b *testing.B) {
 	}
 	defer iter.Close()
 
-	for i := 0; i < b.N; i++ {
-		if iter.Next() != true {
+	for i := range b.N {
+		if !iter.Next() {
 			b.Fatalf("cannot advance to chunk %d", i+1)
 		}
 	}

@@ -115,7 +115,7 @@ func newIterator(ra io.ReaderAt, offsets []int64, opt *Options) (*Iterator, erro
 	}
 
 	iter := &Iterator{tr: tr, heap: &minHeap{compare: opt.Compare}, dedupe: opt.Dedupe}
-	for i := 0; i < tr.NumSections(); i++ {
+	for i := range tr.NumSections() {
 		if err := iter.fillHeap(i); err != nil {
 			_ = tr.Close()
 			return nil, err
