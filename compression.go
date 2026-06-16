@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/klauspost/compress/snappy"
+	"github.com/klauspost/compress/zstd"
 )
 
 // Compression codec.
@@ -15,10 +16,11 @@ const (
 	CompressionNone Compression = iota
 	CompressionGzip
 	CompressionSnappy
+	CompressionZstd
 )
 
 func (c Compression) norm() Compression {
-	if c < CompressionNone || c > CompressionSnappy {
+	if c > CompressionZstd {
 		return CompressionNone
 	}
 	return c
@@ -31,6 +33,12 @@ func (c Compression) newReader(r io.Reader) (io.ReadCloser, error) {
 	case CompressionSnappy:
 		r := snappy.NewReader(r)
 		return readerNoopCloser{Reader: r}, nil
+	case CompressionZstd:
+		zr, err := zstd.NewReader(r)
+		if err != nil {
+			return nil, err
+		}
+		return zr.IOReadCloser(), nil
 	}
 	return readerNoopCloser{Reader: r}, nil
 }
@@ -42,6 +50,9 @@ func (c Compression) newWriter(w io.Writer) compressedWriter {
 		return wr
 	case CompressionSnappy:
 		wr := snappy.NewBufferedWriter(w)
+		return wr
+	case CompressionZstd:
+		wr, _ := zstd.NewWriter(w, zstd.WithEncoderLevel(zstd.SpeedFastest))
 		return wr
 	}
 	return &writerNoopCloser{Writer: w}

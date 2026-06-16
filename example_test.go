@@ -12,7 +12,7 @@ func Example_map() {
 	sorter := extsort.New(&extsort.Options{
 		Dedupe: bytes.Equal,
 	})
-	defer sorter.Close()
+	defer func() { _ = sorter.Close() }()
 
 	// Put key/value data.
 	_ = sorter.Put([]byte("foo"), []byte("v1"))
@@ -26,7 +26,7 @@ func Example_map() {
 	if err != nil {
 		panic(err)
 	}
-	defer iter.Close()
+	defer func() { _ = iter.Close() }()
 
 	for iter.Next() {
 		fmt.Println(string(iter.Key()), string(iter.Value()))
@@ -45,7 +45,7 @@ func Example_map() {
 func Example_plain() {
 	// Init sorter.
 	sorter := extsort.New(nil)
-	defer sorter.Close()
+	defer func() { _ = sorter.Close() }()
 
 	// Append plain data.
 	_ = sorter.Append([]byte("foo"))
@@ -58,7 +58,7 @@ func Example_plain() {
 	if err != nil {
 		panic(err)
 	}
-	defer iter.Close()
+	defer func() { _ = iter.Close() }()
 
 	for iter.Next() {
 		fmt.Println(string(iter.Data()))
